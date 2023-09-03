@@ -54,7 +54,7 @@ const mongoose = require("mongoose");
 mongoose.connect(beş_config.mongoURL,{useUnifiedTopology: true,useNewUrlParser: true}).catch((err) => { console.log("🔴 MONGO_URL Bağlantı Hatası"); });
 mongoose.connection.on("connected", () => {console.log(`🟢 MONGO_URL Başarıyla Bağlanıldı`);});
 mongoose.connection.on("error", (err) => {console.error("🔴 MONGO_URL Bağlantı Hatası; "+err);});
-
+/*
 const { GiveawaysManager } = require('discord-giveaways');
 const manager = new GiveawaysManager(client, {
   storage: './util/giveaways.json',
@@ -73,7 +73,7 @@ const manager = new GiveawaysManager(client, {
   }
 });
 client.giveawaysManager = manager;
-
+*/
 async function cMuteCheck() {
   let guild = await client.guilds.fetch(beş_config.guildID)
   let data = db.all().filter(i => i.ID.startsWith("cmuted-"))
@@ -408,7 +408,7 @@ client.getTaskMessage = (type, count, channels) => {
 
 
 GuildMember.prototype.giveTask = async function (guildID, type, count, prizeCount, active = true, duration, channels = []) {
-  const id = await task.find({ guildID });
+  const id = await task.find({ guildId:guildID });
   const taskMessage = client.getTaskMessage(type, count, channels);
   return await new task({
     guildId:guildID,
@@ -432,7 +432,7 @@ GuildMember.prototype.updateTask = async function (guildID, type, data, channel 
     active: true
   });
   taskData.forEach(async (x) => {
-    if(db.has("five-channel-chat") && channel.id !== db.get("five-channel-chat"))return;
+    if(type == "mesaj" && db.has("five-channel-chat") && channel.id !== db.get("five-channel-chat"))return;
     if (channel && x.channels && x.channels.some((x) => x !== channel.id)) return;
     x.completedCount += data;
     if (x.completedCount >= x.count) {
