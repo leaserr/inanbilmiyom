@@ -1,23 +1,25 @@
 {
-  "name": "bes-v14-pm2-welcome",
+  "name": "bes-v14-pm2-shields",
   "version": "1.0.0",
   "description": "Beş v14 PM2 Custom PM2 Bots",
   "main": "beş.js",
   "scripts": {
-    "test": "node beş.js",
-    "start": "node beş.js"
-  },
-  "engines": {
-    "node": "16.x"
+    "start": "node beş.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Beş",
-  "license": "GPL-3.0",
+  "license": "ISC",
   "dependencies": {
+    "@discordjs/formatters": "^0.3.0",
     "@discordjs/voice": "^0.16.0",
+    "discord-anti-spam": "^2.8.1",
+    "discord-url": "^4.0.0",
     "discord.js": "^14.9.0",
-    "ffmpeg-static": "^5.1.0",
-    "play-dl": "^1.9.6",
-    "tweetnacl": "^1.0.3"
+    "five.db": "^0.0.8",
+    "fs": "^0.0.1-security",
+    "mongoose": "^7.0.5",
+    "node-schedule": "^2.1.1",
+    "request": "^2.88.2"
   },
   "keywords": [
     "Beş#0005",
@@ -30,4 +32,3 @@
     "discord v14"
   ]
 }
-
