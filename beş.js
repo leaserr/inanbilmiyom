@@ -1,859 +1,482 @@
-const { WebhookClient, EmbedBuilder, AuditLogEvent, Events, Collection, ChannelType, PermissionFlagsBits } = require('discord.js')
-let { BEŞ } = require('./beş_client');
-let conf = require('./beş_config');
-const { scheduleJob } = require("node-schedule");
-const { YamlDatabase } = require('five.db');
-const { readdir } = require('fs');
-let { log } = console;
-const { codeBlock } = require('@discordjs/formatters');
-const { VanityClient } = require('discord-url');
-const urlClient = new VanityClient(conf.selfBotToken, conf.guildID, true)
+const { Collection, EmbedBuilder, codeBlock,GuildMember } = require("discord.js");
+const beş_config = require("./beş_config")
+const { BEŞ } = require('./beş_client');
+const client = global.client = new BEŞ();
 
-let mainShield = global.mainShield = new BEŞ();
-let roleShield = new BEŞ();
-let channelShield = new BEŞ();
-let otherShield = new BEŞ()
-const db = global.db = new YamlDatabase();
-
-const webHook = new WebhookClient({ url: conf.WebHookURL });
-async function send(message, entry) {
-    let beş_embed = new EmbedBuilder()
-        .setColor("#2f3136")
-        .setThumbnail(entry.avatarURL({ dynamic: true }))
-        .setDescription(`${message}`)
-    return webHook.send({ embeds: [beş_embed] }).catch(err => {
-        console.err("Webhook Gönderiminde Bir Hata Gerçekleşti!")
-    })
-}
-
-async function mainBots(id) {
-    if (id == mainShield.user.id || id == roleShield.user.id || id == otherShield.user.id || id == channelShield.user.id) return true;
-    return false;
-}
-
-async function checkWhitelist(id) {
-    let member = mainShield.guilds.cache.get(conf.guildID).members.cache.get(id);
-    let data = await db.get(`whitelist_${conf.guildID}`) || [];
-    if (member && data.some(id => member.id == id) || data.some(id => member.roles.cache.has(id))) return true;
-    return false;
-}
-
-let perms = conf.staffPerms;
-async function punish(client, member, type) {
-    if (!["kick", "ban", "ytçek", "jail"].some(bes => type == bes)) return console.error("Punish İşlemi Yanlış Belirtilmiş!\nytçek,ban,jail veya kick Olarak Giriniz!")
-    let guild = client.guilds.cache.get(conf.guildID);
-    let user = guild.members.cache.get(member);
-    switch (type) {
-        case 'jail':
-            await user.roles.cache.has(guild.roles.premiumSubscriberRole ? message.guild.roles.premiumSubscriberRole.id : "5") ? user.roles.set([message.guild.roles.premiumSubscriberRole.id, ...conf.jailRoles]) : user.roles.set([...conf.jailRoles])
-            log(`{PUNISH} ${user.user.tag} Kullanıcısına [JAIL] İşlemi Uygulandı!`)
-            break;
-        case 'ban':
-            user.ban()
-            log(`{PUNISH} ${user.user.tag} Kullanıcısına [BAN] İşlemi Uygulandı!`)
-            break;
-        case 'kick':
-            user.kick()
-            log(`{PUNISH} ${user.user.tag} Kullanıcısına [KICK] İşlemi Uygulandı!`)
-            break;
-        case 'ytçek':
-            await user.roles.remove(user.roles.cache.filter((bes) => bes.editable && bes.name !== "@everyone" && perms.some(perm => bes.permissions.has(perm))).map((bes) => bes.id));
-            log(`{PUNISH} ${user.user.tag} Kullanıcısına [YETKİ ÇEKME] İşlemi Uygulandı!`)
-            break;
-    }
-
-}
-
-const commands = mainShield.commands = new Collection();
-const aliases = mainShield.aliases = new Collection();
-readdir("./beş_commands/", (err, files) => {
-    if (err) console.error(err)
-    files.forEach(f => {
-        readdir("./beş_commands/" + f, (err2, files2) => {
-            if (err2) console.log(err2)
-            files2.forEach(file => {
-                let beş_prop = require(`./beş_commands/${f}/` + file);
-                console.log(`🧮 [BEŞ - COMMANDS] ${beş_prop.name} Yüklendi!`);
-                commands.set(beş_prop.name, beş_prop);
-                beş_prop.aliases.forEach(alias => { aliases.set(alias, beş_prop.name); });
-            });
-        });
+const { YamlDatabase,JsonDatabase } = require('five.db')
+const db = client.db = new YamlDatabase();
+const rdb = client.rdb = new JsonDatabase({databasePath:"./ranks.json"});
+client.ranks = rdb.has(`ranks`) ? rdb.get(`ranks`).sort((x, y) => x.point - y.point) : [];
+client.tasks = rdb.get("tasks") || [];
+const { readdir } = require("fs");
+const { conf } = require("./src/beş_events/joinEvent");
+const commands = client.commands = new Collection();
+const aliases = client.aliases = new Collection();
+const invites = client.invites = new Collection();
+const task = require("./src/beş_schemas/tasksSchema")
+const point = require("./src/beş_schemas/staffsSchema")
+readdir("./src/beş_commands/", (err, files) => {
+  if (err) console.error(err)
+  files.forEach(f => {
+    readdir("./src/beş_commands/" + f, (err2, files2) => {
+      if (err2) console.log(err2)
+      files2.forEach(file => {
+        let beş_prop = require(`./src/beş_commands/${f}/` + file);
+        console.log(`🧮 [BEŞ - COMMANDS] ${beş_prop.name} Yüklendi!`);
+        commands.set(beş_prop.name, beş_prop);
+        beş_prop.aliases.forEach(alias => { aliases.set(alias, beş_prop.name); });
+      });
     });
-});
-
-mainShield.on(Events.MessageCreate, async (message) => {
-    if (conf.prefix && !message.content.startsWith(conf.prefix)) return;
-    const args = message.content.slice(1).trim().split(/ +/g);
-    const commands = args.shift().toLowerCase();
-    const cmd = mainShield.commands.get(commands) || [...mainShield.commands.values()].find((e) => e.aliases && e.aliases.includes(commands));
-    const beş_embed = new EmbedBuilder()
-        .setColor(`#2f3136`)
-        .setAuthor({ name: message.member.displayName, iconURL: message.author.avatarURL({ dynamic: true, size: 2048 }) })
-        .setFooter({ text: conf && conf.presence.length > 0 ? conf.presence : "Beş Was Here", iconURL: message.author.avatarURL({ dynamic: true, size: 2048 }) })
-    if (cmd) {
-        cmd.execute(mainShield, message, args, beş_embed);
-    }
-})
-
-mainShield.on(Events.ClientReady, async () => {
-    log(`${mainShield.user.tag} Aktif!`)
-})
-mainShield.login(conf.mainShield)
-
-roleShield.on(Events.ClientReady, async () => {
-    log(`${roleShield.user.tag} Aktif!`)
-})
-roleShield.login(conf.roleShield)
-
-channelShield.on(Events.ClientReady, async () => {
-    log(`${channelShield.user.tag} Aktif!`)
-})
-channelShield.login(conf.channelShield)
-
-otherShield.on(Events.ClientReady, async () => {
-    log(`${otherShield.user.tag} Aktif!`)
-})
-otherShield.login(conf.otherShield)
-
-roleShield.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    if (oldMember.roles.cache.size != newMember.roles.cache.size) {
-        let logs = await oldMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberRoleUpdate });
-        let entry = logs.entries.first();
-        if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldMember.guild.ownerId) return;
-        if (await checkWhitelist(entry.executor.id)) {
-            return await send(`
-            > **${entry.executor} Bir Üyenin Rolünü Güncelledi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-        
-            > **Rol Veren/Alan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-            > **İşlem Uygulanan Kişi: ${newMember.user} \`(${newMember.id})\`**
-            > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-            > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-        }
-        let member = await oldMember.guild.members.fetch(entry.executor.id);
-        let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-        if (member && member.bannable) { await punish(roleShield, member.id, conf.Process.roleAddRemove) }
-        newMember.roles.set(oldMember.roles.cache.map(r => r.id));
-        await send(`
-    > **${entry.executor} Bir Üyenin Rolünü Güncelledi! İşlem Eski Haline Getirildi Ve ${response}**
-
-    > **Rol Veren/Alan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **İşlem Uygulanan Kişi: ${newMember.user} \`(${newMember.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-});
-
-roleShield.on(Events.GuildRoleDelete, async (oldRole) => {
-    let logs = await oldRole.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleDelete });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldRole.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-           > **${entry.executor} Bir Rol Sildi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-
-           > **Database Üzerinden Geri Açmak İçin;**
-           ${codeBlock("fix", `${conf.prefix}rol-kur ${oldRole.id}`)}
-       
-           > **Rolü Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-           > **Silinen Rol: ${oldRole.name} \`(${oldRole.id})\`**
-           > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-           > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldRole.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(roleShield, member.id, conf.Process.roleDelete) }
-
-    await oldRole.guild.roles.create({
-        name: oldRole.name,
-        color: oldRole.color,
-        hoist: oldRole.hoist,
-        permissions: oldRole.permissions,
-        position: oldRole.position,
-        mentionable: oldRole.mentionable,
-        reason: "Shield ~ Silinen Rol Geri Açıldı!"
-    });
-
-    await send(`
-    > **${entry.executor} Bir Rol Sildi! ${response}**
-
-    > **Database Üzerinden Geri Açmak İçin;**
-    ${codeBlock("fix", `${conf.prefix}rol-kur ${oldRole.id}`)}
-
-    > **Rolü Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Silinen Rol: ${oldRole.name} \`(${oldRole.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+  });
 });
 
 
-roleShield.on(Events.GuildRoleCreate, async (oldRole) => {
-    let logs = await oldRole.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleCreate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldRole.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-           > **${entry.executor} Bir Rol Açtı! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-           > **Rolü Açan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-           > **Açılan Rol: ${oldRole.name} \`(${oldRole.id})\`**
-           > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-           > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldRole.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(roleShield, member.id, conf.Process.roleCreate) }
-    oldRole.delete({ reason: `Shield ~ İzinsiz Rol Açma İşlemi!` })
-    await send(`
-> **${entry.executor} Bir Rol Açtı! ${response}**
-
-> **Rolü Açan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Açılan Rol: ${oldRole.name} \`(${oldRole.id})\`**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+readdir("./src/beş_events", (err, files) => {
+  if (err) return console.error(err);
+  files.filter((file) => file.endsWith(".js")).forEach((file) => {
+    let beş_prop = require(`./src/beş_events/${file}`);
+    if (!beş_prop.conf) return;
+    client.on(beş_prop.conf.name, beş_prop);
+    console.log(`📚 [BEŞ _ EVENTS] ${beş_prop.conf.name} Yüklendi!`);
+  });
 });
 
-roleShield.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {
-    let logs = await oldRole.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleUpdate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldRole.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Rol Güncellendi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **Rolü Düzenliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Düzenlenen Rol: ${oldRole.name} \`(${oldRole.id})\`**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldRole.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(roleShield, member.id, conf.Process.roleUpdate) }
-    newRole.edit({
-        name: oldRole.name,
-        color: oldRole.color,
-        hoist: oldRole.hoist,
-        permissions: oldRole.permissions,
-        position: oldRole.position,
-        mentionable: oldRole.mentionable,
-        reason: `Shield ~ İzinsiz Rol Güncelleme İşlemi!`
-    })
-
-    await send(`
-> **${entry.executor} Bir Rol Güncellendi! ${response}**
-
-> **Rolü Düzenliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Düzenlenen Rol: ${oldRole.name} \`(${oldRole.id})\`**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+readdir("./src/beş_trackers", (err, files) => {
+  if (err) return console.error(err);
+  files.filter((file) => file.endsWith(".js")).forEach((file) => {
+    let beş_prop = require(`./src/beş_trackers/${file}`);
+    if (!beş_prop.conf) return;
+    client.on(beş_prop.conf.name, beş_prop);
+    console.log(`📩 [BEŞ _ TRACKERS] ${beş_prop.conf.name} Yüklendi!`);
+  });
 });
-
-
-
-channelShield.on(Events.ChannelDelete, async (oldChannel, newChannel) => {
-    let logs = await oldChannel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelDelete });
-    let entry = logs.entries.first();
-    if (!entry) return;
-    let tür = { 2: "Ses Kanalı", 0: "Metin Kanalı", 5: "Duyuru Kanalı", 4: "Kategori", 13: "Sahne", 15: "Forum" }
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldChannel.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Kanal Silindi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **Database Üzerinden Geri Açmak İçin;**
-        ${codeBlock("fix", `${conf.prefix}kanal-kur ${oldChannel.id}`)}
-
-        > **Kanalı Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Silinen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldChannel.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(channelShield, member.id, conf.Process.channelDelete) }
-    if (oldChannel.type == 4) {
-        oldChannel.guild.channels.create({
-            name: oldChannel.name,
-            rawPosition: oldChannel.rawPosition,
-            type: ChannelType.GuildCategory
-        })
-    } else {
-        oldChannel.clone({ parent: oldChannel.parentId })
+const mongoose = require("mongoose");
+mongoose.connect(beş_config.mongoURL,{useUnifiedTopology: true,useNewUrlParser: true}).catch((err) => { console.log("🔴 MONGO_URL Bağlantı Hatası"); });
+mongoose.connection.on("connected", () => {console.log(`🟢 MONGO_URL Başarıyla Bağlanıldı`);});
+mongoose.connection.on("error", (err) => {console.error("🔴 MONGO_URL Bağlantı Hatası; "+err);});
+/*
+const { GiveawaysManager } = require('discord-giveaways');
+const manager = new GiveawaysManager(client, {
+  storage: './util/giveaways.json',
+  default: {
+    botsCanWin: false,
+    embedColor: '#00ff00',
+    embedColorEnd: '#ff0000',
+    reaction: '🎉',
+    lastChance: {
+      enabled: true,
+      content: '⚠️ **KATILIM İÇİN SON ŞANS!** ⚠️',
+      threshold: 20000,
+      embedColor: '#FF0000'
     }
 
-    await send(`
-> **${entry.executor} Bir Kanal Silindi! ${response}**
-
-> **Database Üzerinden Geri Açmak İçin;**
-${codeBlock("fix", `${conf.prefix}kanal-kur ${oldChannel.id}`)}
-
-> **Kanalı Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Silinen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+  }
 });
-
-channelShield.on(Events.ChannelCreate, async (oldChannel) => {
-    let logs = await oldChannel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelCreate });
-    let entry = logs.entries.first();
-    let tür = { 2: "Ses Kanalı", 0: "Metin Kanalı", 5: "Duyuru Kanalı", 4: "Kategori", 13: "Sahne", 15: "Forum" }
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldChannel.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Kanal Açıldı! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **Kanalı Açan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Açılan Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+client.giveawaysManager = manager;
+*/
+async function cMuteCheck() {
+  let guild = await client.guilds.fetch(beş_config.guildID)
+  let data = db.all().filter(i => i.ID.startsWith("cmuted-"))
+  if (data.length < 1) return;
+  for (let i in data) {
+    if (data[i].data && data[i].data !== null) {
+      if (data[i].data <= Date.now()) {
+        let id = data[i].ID.split("-")[1];
+        let member = guild.members.cache.get(id);
+        if (!member) return;
+        let muterole = await db.get("five-cmute-roles");
+        if (!muterole) return;
+        let log = client.kanalbul("mute-log")
+        if (!log) return;
+        member.roles.remove(muterole).catch(err => { })
+        db.delete(`cmuted-${member.user.id}`)
+        return log.send({ embeds: [new EmbedBuilder().setColor("#ff0000").setDescription(`> **${member} Kişisinin Susturma Süresi Bitti, Susturması Kaldırıldı!**`)] })
+      }
     }
-    let member = await oldChannel.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(channelShield, member.id, conf.Process.channelCreate) }
-
-    oldChannel.delete({ reason: `Shield ~ İzinsiz Kanal Açma İşlemi!` })
-
-    await send(`
-> **${entry.executor} Bir Kanal Açıldı! ${response}**
-
-> **Kanalı Açan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Açılan Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-});
-
-channelShield.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
-    let logs = await oldChannel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelUpdate });
-    let entry = logs.entries.first();
-    let tür = { 2: "Ses Kanalı", 0: "Metin Kanalı", 5: "Duyuru Kanalı", 4: "Kategori", 13: "Sahne", 15: "Forum" }
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldChannel.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Kanal Güncellendi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **Kanalı Güncelliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Güncellenen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
+  }
+}
+async function vMuteCheck() {
+  let guild = await client.guilds.fetch(beş_config.guildID)
+  let data = db.all().filter(i => i.ID.startsWith("vmuted-"))
+  if (data.length < 1) return;
+  for (let i in data) {
+    if (data[i].data && data[i].data !== null) {
+      if (data[i].data <= Date.now()) {
+        let id = data[i].ID.split("-")[1];
+        let member = guild.members.cache.get(id);
+        if (!member) return;
+        if (!member.voice.channel) return;
+        let log = client.kanalbul("vmute-log")
+        if (!log) return;
+        member.voice.setMute(false).catch(err => { })
+        db.delete(`vmuted-${member.user.id}`)
+        return log.send({ embeds: [new EmbedBuilder().setColor("#ff0000").setDescription(`> **${member} Kişisinin Susturma Süresi Bitti, Susturması Kaldırıldı!**`)] })
+      }
     }
-    let member = await oldChannel.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(channelShield, member.id, conf.Process.channelUpdate) }
-    
-    oldChannel.guild.channels.edit(newChannel.id,{
-        name:oldChannel.name,
-        position:oldChannel.position,
-        topic:oldChannel.topic,
-        nsfw:oldChannel.nsfw,
-        parent:oldChannel.parent,
-        userLimit:oldChannel.userLimit,
-        bitrate:oldChannel.bitrate,
-    })
-
-
-    await send(`
-> **${entry.executor} Bir Kanal Güncellendi! ${response}**
-
-> **Kanalı Güncelliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Güncellenen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-
-});
-
-
-channelShield.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
-    let logs = await oldChannel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelOverwriteUpdate });
-    let entry = logs.entries.first();
-    let tür = { 2: "Ses Kanalı", 0: "Metin Kanalı", 5: "Duyuru Kanalı", 4: "Kategori", 13: "Sahne", 15: "Forum" }
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldChannel.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Kanal İzinleri Güncellendi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **Kanalı Güncelliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Güncellenen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldChannel.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(channelShield, member.id, conf.Process.channelUpdate) }
-
-    await newChannel.permissionOverwrites.set([...oldChannel.permissionOverwrites.cache.values()]);
-
-    await send(`
-> **${entry.executor} Bir Kanal İzinleri Güncellendi! ${response}**
-
-> **Kanalı Güncelliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Güncellenen Kanal: ${oldChannel.name} \`(${oldChannel.id})\` [\`${tür[oldChannel.type]}\`]**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-
-});
-
-
-
-mainShield.on(Events.GuildUpdate, async (oldGuild, newGuild) => {
-    if (oldGuild.vanityURLCode !== newGuild.vanityURLCode) {
-        let logs = await oldGuild.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.GuildUpdate });
-        let entry = logs.entries.first();
-        if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldGuild.ownerId) return;
-        let member = await oldGuild.guild.members.fetch(entry.executor.id);
-        let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-        if (member && member.bannable) { await punish(mainShield, member.id, conf.Process.urlUpdate) }
-        urlClient.setVanityURL(conf.vanityURL).catch(err=>{});
-        await send(`
-> **${entry.executor} Kullanıcısı URL Üzerinde İşlem Gerçekleştirdi! ${response}**
-
-> **URL'ye İşlem Yapan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Eski URL: \`${oldGuild.vanityURLCode}\`**
-> **Değiştirilen URL: \`${newGuild.vanityURLCode}\`**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-});
-urlClient.on("VanitySuccess", async (response) => { log(`${response.vanityURL} URL'si Başarıyla Alındı`) })
-urlClient.on('VanityError', async (error) => { log(`URL Alınırken Bir Hata Meydana Geldi!!\nHata; ${error.error}`); })
+  }
 }
 
-mainShield.on(Events.GuildUpdate, async (oldGuild, newGuild) => {
-    if ((oldGuild.splash !== newGuild.splash) || (oldGuild.iconURL() !== newGuild.iconURL()) || (oldGuild.name !== newGuild.name) || (oldGuild.bannerURL() !== newGuild.bannerURL())) {
-        let logs = await oldGuild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.GuildUpdate });
-        let entry = logs.entries.first();
-        if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldGuild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Kullanıcısı Sunucu Üzerinde İşlem Gerçekleştirdi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-           
-        > **İşlem Yapan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Eski Sunucu Bilgileri: \`${oldGuild.name}\` ${oldGuild.bannerURL() !== null ? `[Banner](${oldGuild.bannerURL()})` : ""} ${oldGuild.iconURL() !== null ? `[Icon](${oldGuild.iconURL()})` : ""} ${oldGuild.splash !== null ? `[Invite Banner](${oldGuild.splash})` : ""}**
-        > **Değişen Sunucu Bilgileri: \`${newGuild.name}\` ${newGuild.bannerURL() !== null ? `[Banner](${newGuild.bannerURL()})` : ""} ${newGuild.iconURL() !== null ? `[Icon](${newGuild.iconURL()})` : ""} ${newGuild.splash !== null ? `[Invite Banner](${newGuild.splash})` : ""}**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-        let member = await oldGuild.members.fetch(entry.executor.id);
-        let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-        if (member && member.bannable) { await punish(mainShield, member.id, conf.Process.serverUpdate) }
-        if (oldGuild.iconURL() !== newGuild.iconURL()) newGuild.setIcon(oldGuild.iconURL({ dynamic: true }))
-        if (oldGuild.bannerURL() !== newGuild.bannerURL()) newGuild.setBanner(oldGuild.bannerURL({ size: 2048, dynamic: true }))
-        if (oldGuild.name !== newGuild.name) newGuild.setName(oldGuild.name)
-        if (oldGuild.splash !== newGuild.splash) newGuild.setSplash(oldGuild.splash)
-        await send(`
-> **${entry.executor} Kullanıcısı Sunucu Üzerinde İşlem Gerçekleştirdi! ${response}**
+setInterval(async () => {
+  await cMuteCheck();
+  await vMuteCheck();
+}, 3000);
 
-> **İşlem Yapan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Eski Sunucu Bilgileri: \`${oldGuild.name}\` ${oldGuild.bannerURL() !== null ? `[Banner](${oldGuild.bannerURL()})` : ""} ${oldGuild.iconURL() !== null ? `[Icon](${oldGuild.iconURL()})` : ""} ${oldGuild.splash !== null ? `[Invite Banner](${oldGuild.splash})` : ""}**
-> **Değişen Sunucu Bilgileri: \`${newGuild.name}\` ${newGuild.bannerURL() !== null ? `[Banner](${newGuild.bannerURL()})` : ""} ${newGuild.iconURL() !== null ? `[Icon](${newGuild.iconURL()})` : ""} ${newGuild.splash !== null ? `[Invite Banner](${newGuild.splash})` : ""}**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-});
-const AntiSpam = require("discord-anti-spam");
-const { channel } = require('diagnostics_channel');
-const antiSpam = new AntiSpam(conf.antiSpam);
-otherShield.on(Events.MessageCreate, async (message) => { antiSpam.message(message); })
-otherShield.on(Events.GuildMemberRemove, async (member) => { antiSpam.userleave(member); });
+Collection.prototype.array = function () { return [...this.values()] }
 
-otherShield.on(Events.GuildEmojiCreate, async (emoji) => {
-    let logs = await emoji.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.EmojiCreate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == emoji.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-        > **${entry.executor} Bir Emoji Oluşturdu! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-        
-        > **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-        > **Emoji Bilgileri: \`${emoji.name}\` [Emoji URL](${emoji.url})**
-        > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-        > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await emoji.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.emojiCreate) }
-    emoji.delete();
-    await send(`
-> **${entry.executor} Bir Emoji Oluşturdu! ${response}**
-
-> **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Emoji Bilgileri: \`${emoji.name}\` [Emoji URL](${emoji.url})**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.GuildEmojiDelete, async (emoji) => {
-    let logs = await emoji.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.EmojiDelete });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == emoji.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Emoji Sildi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Emoji Bilgileri: \`${emoji.name}\` [Emoji URL](${emoji.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await emoji.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.emojiDelete) }
-    emoji.guild.emojis.create({ attachment: emoji.url, name: emoji.name })
-    await send(`
-> **${entry.executor} Bir Emoji Sildi! ${response}**
-
-> **Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-> **Emoji Bilgileri: \`${emoji.name}\` [Emoji URL](${emoji.url})**
-> **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-> **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-
-otherShield.on(Events.GuildEmojiUpdate, async (oldEmoji, newEmoji) => {
-    let logs = await oldEmoji.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.EmojiUpdate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldEmoji.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Emoji Güncelledi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Güncelleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Eski Emoji Bilgileri: \`${oldEmoji.name}\` [Emoji URL](${oldEmoji.url})**
-   > **Yeni Emoji Bilgileri: \`${newEmoji.name}\` [Emoji URL](${newEmoji.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldEmoji.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.emojiUpdate) }
-    newEmoji.edit({ name: oldEmoji.name })
-    await send(`
-    > **${entry.executor} Bir Emoji Güncelledi! ${response}**
-
-   > **Güncelleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Eski Emoji Bilgileri: \`${oldEmoji.name}\` [Emoji URL](${oldEmoji.url})**
-   > **Yeni Emoji Bilgileri: \`${newEmoji.name}\` [Emoji URL](${newEmoji.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.GuildStickerCreate, async (sticker) => {
-    let logs = await sticker.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.StickerCreate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == sticker.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Sticker Oluşturdu! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Sticker Bilgileri: \`${sticker.name}\` [Sticker URL](${sticker.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await sticker.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.stickerCreate) }
-    sticker.delete()
-    await send(`
-    > **${entry.executor} Bir Sticker Oluşturdu! ${response}**
-
-    > **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Sticker Bilgileri: \`${sticker.name}\` [Sticker URL](${sticker.url})**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.GuildStickerDelete, async (sticker) => {
-    let logs = await sticker.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.StickerDelete });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == sticker.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Sticker Sildi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Sticker Bilgileri: \`${sticker.name}\` [Sticker URL](${sticker.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await sticker.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.stickerDelete) }
-    sticker.guild.stickers.create({ file: sticker.url, name: sticker.name, tags: sticker.tags, description: sticker.description })
-    await send(`
-    > **${entry.executor} Bir Sticker Sildi! ${response}**
-
-    > **Silen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Sticker Bilgileri: \`${sticker.name}\` [Sticker URL](${sticker.url})**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.GuildStickerUpdate, async (oldSticker, newSticker) => {
-    let logs = await oldSticker.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.StickerUpdate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == oldSticker.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Sticker Güncelledi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Güncelleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Eski Sticker Bilgileri: \`${oldSticker.name}\` [Sticker URL](${oldSticker.url})**
-   > **Yeni Sticker Bilgileri: \`${newSticker.name}\` [Sticker URL](${newSticker.url})**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await oldSticker.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.stickerUpdate) }
-    newSticker.edit({ name: oldSticker.name, tags: oldSticker.tags, description: oldSticker.description })
-    await send(`
-    > **${entry.executor} Bir Sticker Güncelledi! ${response}**
-
-    > **Güncelleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Eski Sticker Bilgileri: \`${oldSticker.name}\` [Sticker URL](${oldSticker.url})**
-    > **Yeni Sticker Bilgileri: \`${newSticker.name}\` [Sticker URL](${newSticker.url})**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.WebhooksUpdate, async (webhook) => {
-    let logs = await webhook.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.WebhookCreate });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == webhook.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Webhook Oluşturdu! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let member = await webhook.guild.members.fetch(entry.executor.id);
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, conf.Process.webhookUpdate) }
-    const webhooks = await webhook.fetchWebhooks();
-    webhooks.forEach(bes => bes.delete().catch(err => { }))
-    await send(`
-   > **${entry.executor} Bir Webhook Oluşturdu! ${response}**
-
-   > **Oluşturan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-})
-
-otherShield.on(Events.ClientReady, async () => {
-    let guild = otherShield.guilds.cache.get(conf.guildID);
-    let channel = guild.channels.cache.find(bes => bes.name == "others-log");
-    if(!guild || !channel)return
-    let besData = db.has(`bes_automoderation`);
-    if (!besData) {
-        log(`[AUTOMOD] Küfür Filtresi Başarıyla Kuruldu!`)
-        guild.autoModerationRules.create({
-            name: `Beş Tarafından!`, creatorId: otherShield.user.id, enabled: true, eventType: 1, triggerType: 1,
-            triggerMetadata: { keywordFilter: conf.Curses }, actions: [{ type: 1, metadata:{channel:channel,durationSeconds: 10, customMessage: "Sunucumuzda Argo & Küfürlü Konuşmak Yasaktır!" } }]
-        })
-        guild.autoModerationRules.create({
-            name: `Beş Tarafından!`, creatorId: otherShield.user.id, enabled: true, eventType: 1, triggerType: 1,
-            triggerMetadata: { keywordFilter: conf.Ads }, actions: [{ type: 1, metadata: {channel:channel,durationSeconds: 10, customMessage: "Sunucumuzda Link & Reklam Yapmak Yasaktır!" } }]
-        })
-        db.set(`bes_automoderation`, true)
-    } else return;
-})
-
-mainShield.on(Events.PresenceUpdate,async(oldUser, newUser) => {
-const status = Object.keys(newUser.clientStatus);
-if (!newUser.user.bot && newUser.guild.id == conf.guildID && conf.staffPerms.some(bes => newUser.member.permissions.has(bes))){
-if(status.find(bes => bes === "web")) {
-    let guild = mainShield.guilds.cache.get(conf.guildID);
-    if (newUser.user.id == guild.ownerId) return;
-    let member = guild.members.cache.get(newUser.user.id)
-    if (!member || await mainBots(member.user.id)) return;
-    log(`[WEB] ${member.user.tag} Kullanıcısı Web Üzerinden Giriş Yaptı!`)
-    if (await checkWhitelist(member.user.id)) {
-        return await send(`
-   > **${member} Kullanıcı [WEB] Üzerinden Giriş Yaptı! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Kişi: ${member} \`(${member.user.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, member.user)
-    }
-    let response = member.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(mainShield, member.id, conf.Process.webLogin) }
-    await send(`
-    > **${member} Kullanıcı [WEB] Üzerinden Giriş Yaptı! ${response}**
-
-    > **Kişi: ${member} \`(${member.user.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, member.user)
- }}
-})
-
-otherShield.on(Events.GuildMemberAdd,async(member) => {
-    if(!member.user.bot)return;
-    let logs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.BotAdd });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == member.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Bot Ekledi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Ekliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Eklenen Bot: ${member.user.tag} \`(${member.user.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let memberBes = await member.guild.members.fetch(entry.executor.id);
-    let response = memberBes.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (member && member.bannable) { await punish(otherShield, member.id, "ban") }
-    if (memberBes && memberBes.bannable) { await punish(otherShield, memberBes.id, conf.Process.botAdd) }
-    await send(`
-    > **${entry.executor} Bir Bot Ekledi! ${response}**
-
-    > **Ekliyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Eklenen Bot: ${member.user.tag} \`(${member.user.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    
-})
-
-otherShield.on(Events.GuildBanAdd,async(member) => {
-    let logs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == member.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Kullanıcıyı Banladı! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Banlayan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Banlanan Kişi: ${member.user.tag} \`(${member.user.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let memberBes = await member.guild.members.fetch(entry.executor.id);
-    let response = memberBes.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (memberBes && memberBes.bannable) { await punish(otherShield, memberBes.id, conf.Process.memberBanAdd) }
-    member.guild.members.unban(member.user.id)
-    await send(`
-    > **${entry.executor} Bir Kullanıcıyı Banladı! ${response}**
-
-    > **Banlayan Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Banlanan Kişi: ${member.user.tag} \`(${member.user.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor) 
-})
-
-otherShield.on(Events.GuildMemberRemove,async(member) => {
-    let logs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberKick });
-    let entry = logs.entries.first();
-    if (!entry || await mainBots(entry.executor.id) || entry.executor.id == member.guild.ownerId) return;
-    if (await checkWhitelist(entry.executor.id)) {
-        return await send(`
-   > **${entry.executor} Bir Kullanıcıyı Kickledi! Üye Güvenlide Olduğu İçin İşlem Uygulanmadı!**
-   
-   > **Kickleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-   > **Kicklenen Kişi: ${member.user.tag} \`(${member.user.id})\`**
-   > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-   > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor)
-    }
-    let memberBes = await member.guild.members.fetch(entry.executor.id);
-    let response = memberBes.bannable ? "Ceza Uyguladım!" : "Yetkim Yetmediği İçin Ceza Uygulayamadım!"
-    if (memberBes && memberBes.bannable) { await punish(otherShield, memberBes.id, conf.Process.memberKickAdd) }
-    await send(`
-    > **${entry.executor} Bir Kullanıcıyı Kickledi! ${response}**
-
-    > **Kickleyen Kişi: ${entry.executor} \`(${entry.executor.id})\`**
-    > **Kicklenen Kişi: ${member.user.tag} \`(${member.user.id})\`**
-    > **Tarih: <t:${Math.floor(Date.now() / 1000)}>**
-    > **Unix Zaman: <t:${Math.floor(Date.now() / 1000)}:R>**`, entry.executor) 
-})
-
-
-scheduleJob('0 0 */2 * * *',async () => {
-if(conf.autoBackup){
-let guild = mainShield.guilds.cache.get(conf.guildID);
-log(`[AUTO BACKUP] Yeni Sunucu Yedeği Alınıyor!`)
-await roleBackUp(guild,conf.guildID)
-await channelBackUp(guild,conf.guildID)
-}
-});
-async function roleBackUp(guild, guildID) {
-    if (db.all().includes("roleBackup_")) {
-        db.all().filter(data => data.ID.includes("roleBackup_")).forEach(data => {
-            db.delete(data.ID)
-        })
-    }
-    guild.roles.cache.forEach(async role => {
-        let rolePerms = [];
-        await guild.channels.cache.filter(beş =>
-            beş.permissionOverwrites.cache.has(role.id)).forEach(bes => {
-                let channelPerm = bes.permissionOverwrites.cache.get(role.id);
-                rolePerms.push({ id: bes.id, allow: channelPerm.allow.toArray(), deny: channelPerm.deny.toArray() });
-            });
-        db.set(`roleBackup_${guildID}_${role.id}`,
-            {
-                roleID: role.id,
-                name: role.name,
-                color: role.hexColor,
-                hoist: role.hoist,
-                position: role.position,
-                permissions: role.permissions.bitfield.toString(),
-                mentionable: role.mentionable,
-                members: role.members.map(m => m.id),
-                writes: rolePerms
-            })
-    });
-    log("Rollerin Verileri Başarıyla Yedeklendi!")
+const { emitWarning } = process;
+process.emitWarning = (warning, ...args) => {
+  if (args[0] === 'ExperimentalWarning') { return; }
+  if (args[0] === "TimeoutOverflowWarning") { return; }
+  if (args[0] && typeof args[0] === 'object' && args[0].type === 'ExperimentalWarning') { return; }
+  return emitWarning(warning, ...args);
 };
-async function channelBackUp(guild, guildID) {
-    if (db.all().includes("channelBackup_")) {
-        db.all().filter(data => data.ID.includes("channelBackup_")).forEach(data => {
-            db.delete(data.ID)
-        })
+
+Promise.prototype.sil = function (time) {
+  if (this) this.then(s => {
+    if (s.deletable) {
+      setTimeout(async () => {
+        s.delete().catch(e => { });
+      }, time * 1000)
     }
-    if (guild) {
-        const channels = [...guild.channels.cache.values()];
-        for (let index = 0; index < channels.length; index++) {
-            const channel = channels[index];
-            let chanPerms = [];
-            channel.permissionOverwrites.cache.forEach(beş => {
-                chanPerms.push({ id: beş.id, type: beş.type, allow: `${beş.allow.bitfield}`, deny: `${beş.deny.bitfield}` });
-            });
-            if (channel.type == 4) { // amal ay prdn ramoşko int kuLLaNdIm hIzLı oLmUşMu kNk :d
-                db.set(`channelBackup_${guildID}_${channel.id}`,
-                    {
-                        type: channel.type,
-                        channelID: channel.id,
-                        name: channel.name,
-                        position: channel.position,
-                        writes: chanPerms
-                    })
-            }
-            if ((channel.type == 0) || (channel.type == 5)) {
-                db.set(`channelBackup_${guildID}_${channel.id}`,
-                    {
-                        type: channel.type,
-                        channelID: channel.id,
-                        name: channel.name,
-                        nsfw: channel.nsfw,
-                        parentID: channel.parentId,
-                        position: channel.position,
-                        rateLimit: channel.rateLimitPerUser,
-                        writes: chanPerms
-                    })
-            }
-            if (channel.type == 2) {
-                db.set(`channelBackup_${guildID}_${channel.id}`,
-                    {
-                        type: channel.type,
-                        channelID: channel.id,
-                        name: channel.name,
-                        bitrate: channel.bitrate,
-                        userLimit: channel.userLimit,
-                        parentID: channel.parentId,
-                        position: channel.position,
-                        writes: chanPerms
-                    })
-            }
-        }
-        log("Kanal Verileri Başarıyla Yedeklendi!");
-    }
+  });
+};
+
+client.splitMessage = function (bes, size) {
+  const xChunks = Math.ceil(bes.length / size)
+  const chunks = new Array(xChunks)
+  for (let i = 0, c = 0; i < xChunks; ++i, c += size) {
+    chunks[i] = bes.substr(c, size)
+  }
+  return chunks
 }
+
+client.true = function (message) {
+  if (message) { message.react(client.emoji("emote_true") !== null ? client.emoji("emote_true") : "✅") }
+};
+
+client.false = function (message) {
+  if (message) { message.react(client.emoji("emote_false") !== null ? client.emoji("emote_false") : "❌") }
+};
+
+
+client.ceza = async function (id, message, type, reason, durations, süre) {
+  let cezaıd = db.get(`cezaid`) || 1;
+  db.add(`cezaid`, 1);
+  let member = await client.users.fetch(id);
+  let yapan = client.guilds.cache.get(beş_config.guildID).members.cache.get(message.author.id);
+  if (!member) return message.react(client.emoji("emote_false") !== null ? client.emoji("emote_false") : "❌");
+  message.react(client.emoji("emote_true") !== null ? client.emoji("emote_true") : "✅")
+  let duration = Math.floor(durations / 1000);
+  if (!type.includes("UN")) db.push(`sicil-${member.id}`, `**[${type}]** \`${yapan.user.tag}\` Tarafından **<t:${duration}> (<t:${duration}:R>)** Zamanında **"${reason}"** Sebebiyle.`)
+  let embed = new EmbedBuilder().setColor("#2f3136").setAuthor({ name: message.member.displayName, iconURL: message.author.avatarURL({ dynamic: true, size: 2048 }) }).setFooter({ text: beş_config.footer ? beş_config.footer : `Beş Was Here`, iconURL: message.author.avatarURL({ dynamic: true, size: 2048 }) })
+  switch (type) {
+    case 'BAN':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle Sunucudan Yasaklandı!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`).setImage(beş_config.banGif)] })
+      if (client.kanalbul("ban-log")) {
+        client.kanalbul("ban-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı [${type}] Cezası Aldı!**`).addFields(
+            { name: `Banlanan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Banliyan Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          ).setImage(null)]
+        })
+      }
+      break;
+    case 'WARN':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle Uyarıldı!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`).setImage(beş_config.banGif)] })
+      if (client.kanalbul("others-log")) {
+        client.kanalbul("others-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı [${type}] Cezası Aldı!**`).addFields(
+            { name: `Uyarılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Uyaran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          ).setImage(null)]
+        })
+      }
+      break;
+    case 'JAIL':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle Cezalıya Atıldı!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`)] })
+      db.set(`aktifceza-${member.id}`, "JAIL")
+      if (client.kanalbul("jail-log")) {
+        client.kanalbul("jail-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı [${type}] Cezası Aldı!**`).addFields(
+            { name: `Cezalıya Atılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezalı Atan Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'VMUTE':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle ${süre} Boyunca Ses Kanallarında Susturuldu!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`)] })
+      db.set(`aktifceza-${member.id}`, "VMUTE")
+      if (client.kanalbul("vmute-log")) {
+        client.kanalbul("vmute-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${süre} Boyunca [${type}] Cezası Aldı!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`).addFields(
+            { name: `Susturulan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Susturan Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Süre`, value: codeBlock("fix", süre), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'CMUTE':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle ${süre} Boyunca Chat Kanallarında Susturuldu!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`)] })
+      db.set(`aktifceza-${member.id}`, "CMUTE")
+      if (client.kanalbul("mute-log")) {
+        client.kanalbul("mute-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${süre} Boyunca [${type}] Cezası Aldı!**`).addFields(
+            { name: `Susturulan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Susturan Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Süre`, value: codeBlock("fix", süre), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'FORCEBAN':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı ${yapan} Tarafından \`${reason}\` Sebebiyle Sunucudan Kalıcı Olarak Yasaklandı!**\n> **\`(Ceza Numarası; #${cezaıd}\`)**`)] })
+      if (client.kanalbul("others-log")) {
+        client.kanalbul("others-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısı [${type}] Cezası Aldı!**`).addFields(
+            { name: `Banlanan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Banliyan Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Sebep`, value: codeBlock("fix", reason), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      db.push(`forcebans`, member.id)
+      break;
+    case 'UNFORCEBAN':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının ${yapan} Tarafından \`FORCEBAN\` Cezası Kaldırıldı!**`)] })
+      if (client.kanalbul("others-log")) {
+        client.kanalbul("others-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının [FORCEBAN] Cezası Kaldırıldı!**`).addFields(
+            { name: `Cezası Kaldırılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezayı Kaldıran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'UNJAIL':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının ${yapan} Tarafından \`JAIL\` Cezası Kaldırıldı!**`)] })
+      if (client.kanalbul("jail-log")) {
+        client.kanalbul("jail-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının [JAIL] Cezası Kaldırıldı!**`).addFields(
+            { name: `Cezası Kaldırılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezayı Kaldıran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'UNCMUTE':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının ${yapan} Tarafından \`CMUTE\` Cezası Kaldırıldı!**`)] })
+      if (client.kanalbul("mute-log")) {
+        client.kanalbul("mute-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının [CMUTE] Cezası Kaldırıldı!**`).addFields(
+            { name: `Cezası Kaldırılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezayı Kaldıran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'UNVMUTE':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının ${yapan} Tarafından \`VMUTE\` Cezası Kaldırıldı!**`)] })
+      if (client.kanalbul("vmute-log")) {
+        client.kanalbul("vmute-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının [VMUTE] Cezası Kaldırıldı!**`).addFields(
+            { name: `Cezası Kaldırılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezayı Kaldıran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+    case 'UNBAN':
+      message.reply({ embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının ${yapan} Tarafından \`BAN\` Cezası Kaldırıldı!**`)] })
+      if (client.kanalbul("ban-log")) {
+        client.kanalbul("ban-log").send({
+          embeds: [embed.setDescription(`> **${member.tag} Kullanıcısının [BAN] Cezası Kaldırıldı!**`).addFields(
+            { name: `Cezası Kaldırılan Kişi`, value: codeBlock("fix", member.tag + " / " + member.id), inline: false },
+            { name: `Cezayı Kaldıran Kişi`, value: codeBlock("fix", yapan.user.tag + " / " + yapan.id), inline: false },
+            { name: `Tarih / Zaman`, value: `**<t:${duration}> (<t:${duration}:R>)**`, inline: false },
+          )]
+        })
+      }
+      break;
+  }
+}
+
+client.kanalbul = function (kanalisim) {
+  let kanal = client.guilds.cache.get(beş_config.guildID).channels.cache.find(bes => bes.name === kanalisim)
+  if (!kanal) return false;
+  return kanal;
+}
+
+client.rolbul = function (rolisim) {
+  let rol = client.guilds.cache.get(beş_config.guildID).roles.cache.find(bes => bes.name === rolisim)
+  if (!rol) return false;
+  return rol;
+}
+
+client.rolinc = function (rolinc) {
+  let rol = client.guilds.cache.get(beş_config.guildID).roles.cache.find(bes => bes.name.toLowerCase().includes(rolinc))
+  if (!rol) return false;
+  return rol;
+}
+
+client.emoji = function (name) {
+  let emoji = client.guilds.cache.get(beş_config.guildID).emojis.cache.find(bes => bes.name == name)
+  if (!emoji) return null;
+  return emoji;
+}
+
+client.sayıEmoji = (sayi) => {
+  var bes = sayi.toString().replace(/ /g, "     ");
+  var bes2 = bes.match(/([0-9])/g);
+  bes = bes.replace(/([a-zA-Z])/g, "Belirlenemiyor").toLowerCase();
+  if (bes2) {
+    bes = bes.replace(/([0-9])/g, d => {
+      return {
+        '0': client.emoji("emote_zero") !== null ? client.emoji("emote_zero") : "0",
+        '1': client.emoji("emote_one") !== null ? client.emoji("emote_one") : "1",
+        '2': client.emoji("emote_two") !== null ? client.emoji("emote_two") : "2",
+        '3': client.emoji("emote_three") !== null ? client.emoji("emote_three") : "3",
+        '4': client.emoji("emote_four") !== null ? client.emoji("emote_four") : "4",
+        '5': client.emoji("emote_five") !== null ? client.emoji("emote_five") : "5",
+        '6': client.emoji("emote_six") !== null ? client.emoji("emote_six") : "6",
+        '7': client.emoji("emote_seven") !== null ? client.emoji("emote_seven") : "7",
+        '8': client.emoji("emote_eight") !== null ? client.emoji("emote_eight") : "8",
+        '9': client.emoji("emote_nine") !== null ? client.emoji("emote_nine") : "9"
+      }[d];
+    });
+  }
+  return bes;
+}
+
+Array.prototype.listRoles = function (type = "mention") {
+  return this.length > 1
+    ? this.slice(0, -1)
+        .map((x) => `<@&${x}>`)
+        .join(", ") +
+        " ve " +
+        this.map((x) => `<@&${x}>`).slice(-1)
+    : this.map((x) => `<@&${x}>`).join("");
+};
+
+GuildMember.prototype.hasRole = function (role, every = true) {
+  return (
+    (Array.isArray(role) && ((every && role.every((x) => this.roles.cache.has(x))) || (!every && role.some((x) => this.roles.cache.has(x))))) || (!Array.isArray(role) && this.roles.cache.has(role))
+  );
+};
+
+client.getTaskMessage = (type, count, channels) => {
+  channels = channels || [];
+  let taskMessage;
+  switch (type) {
+    case "invite":
+      taskMessage = `**Sunucumuza ${count} Kişi Davet Et!**`;
+      break;
+    case "mesaj":
+      taskMessage = `**${db.has("five-channel-chat") ? `<#${db.get("five-channel-chat")}>` : "Genel Sohbet"} Kanalına ${count} Mesaj at!**`;
+      break;
+    case "ses":
+      taskMessage = `**Ses Kanallarında ${count / 1000 / 60} Dakika Süre Geçir!**`;
+      break;
+    case "taglı":
+      taskMessage = `**${count} Kişiye Tag Aldır!**`;
+      break;
+    case "kayıt":
+      taskMessage = `**Sunucumuzda ${count} Kişi Kayıt Et!**`;
+      break;
+    default:
+      taskMessage = "**Bulunamadı!**";
+      break;
+  }
+  return taskMessage;
+};
+
+
+GuildMember.prototype.giveTask = async function (guildID, type, count, prizeCount, active = true, duration, channels = []) {
+  const id = await task.find({ guildId:guildID });
+  const taskMessage = client.getTaskMessage(type, count, channels);
+  return await new task({
+    guildId:guildID,
+    userId: this.user.id,
+    id: id ? id.length + 1 : 1,
+    type,
+    count,
+    prizeCount,
+    active,
+    finishDate: Date.now() + duration,
+    channels,
+    message: taskMessage
+  }).save();
+};
+
+GuildMember.prototype.updateTask = async function (guildID, type, data, channel = null) {
+  const taskData = await task.find({
+    guildId:guildID,
+    userId: this.user.id,
+    type,
+    active: true
+  });
+  taskData.forEach(async (x) => {
+    if(type == "mesaj" && db.has("five-channel-chat") && channel.id !== db.get("five-channel-chat"))return;
+    if (channel && x.channels && x.channels.some((x) => x !== channel.id)) return;
+    x.completedCount += data;
+    if (x.completedCount >= x.count) {
+      x.active = false;
+      x.completed = true;
+      await point.updateOne({ guildId:guildID, userId: this.user.id }, { $inc: { coin: x.prizeCount } });
+
+      const embed = new EmbedBuilder()
+      .setColor(this.displayHexColor).setDescription(`
+      **${this.toString()} Tebrikler! ${type.charAt(0).toLocaleUpperCase() + type.slice(1)} Görevini Başarıyla Tamamladın!**
+      
+      ${x.message}
+      **${client.emoji("emote_coin")} \`${x.prizeCount} Puan Hesabına Eklendi!\`**
+      `);
+      this.send({embeds:[embed]}).catch(err => { });
+    }
+    await x.save();
+  });
+};
+
+client.progressBar = (value, maxValue, size) => {
+  const progress = Math.round(size * (value / maxValue > 1 ? 1 : value / maxValue));
+  const emptyProgress = size - progress > 0 ? size - progress : 0;
+
+  const progressText = `${client.emoji("emote_fill")}`.repeat(progress);
+  const emptyProgressText = `${client.emoji("emote_empty")}`.repeat(emptyProgress);
+
+  return emptyProgress > 0
+    ? progress === 0
+      ? `${client.emoji("emote_emptystart")}` + progressText + emptyProgressText + `${client.emoji("emote_emptyend")}`
+      : `${client.emoji("emote_fillstart")}` + progressText + emptyProgressText + `${client.emoji("emote_emptyend")}`
+    : `${client.emoji("emote_fillstart")}` + progressText + emptyProgressText + `${client.emoji("emote_fillend")}`;
+};
+
+Array.prototype.random = function () {
+  return this[Math.floor(Math.random() * this.length)];
+};
+
+Array.prototype.last = function () {
+  return this[this.length - 1];
+};
+
+
+
+client.login(beş_config.token).then(() =>
+  console.log(`🟢 ${client.user.tag} Başarıyla Giriş Yaptı!`)
+).catch((beş_err) => console.log(`🔴 Bot Giriş Yapamadı / Sebep: ${beş_err}`));

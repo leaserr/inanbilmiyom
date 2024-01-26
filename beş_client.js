@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, Partials,ActivityType,Events } = require('discord.js');
-const {joinVoiceChannel} = require('@discordjs/voice')
+const { joinVoiceChannel } = require('@discordjs/voice')
 let conf = require('./beş_config');
 
 class BEŞ extends Client {
@@ -18,7 +18,7 @@ class BEŞ extends Client {
               }
         })
 
-        this.on(Events.ClientReady,async () => {
+        this.on(Events.ClientReady, () => {
           let channel = this.guilds.cache.get(conf.guildID).channels.cache.get(conf.voiceChannelID)
           joinVoiceChannel({
           channelId: channel.id,
@@ -28,8 +28,8 @@ class BEŞ extends Client {
           selfDeaf:true,
           selfMute:true
           });
-          })
-          
+        })
+         
          process.on("uncaughtException", (err) => { });
          process.on("unhandledRejection", (err) => { console.log(err) });
          process.on("warning", (warn) => { console.log(warn) });

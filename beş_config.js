@@ -1,87 +1,157 @@
-const {PermissionFlagsBits} = require('discord.js')
 module.exports = {
 
-mainShield: "", // Main Botun Tokeni
-roleShield: "", // Rol Koruma Botunun Tokeni
-channelShield: "", // Kanal Koruma Botunun Tokeni
-otherShield: "", // Diğer İşlemleri Yapam Koruma Botunun Tokeni
+    token: "", //Bot Tokeniniz => Bot Oluşturduktan Sonra Intentsleri Açmayı Unutma!
+    guildID: "", //Kullanıcağın Sunucunun ID'si
+    voiceChannelID: "", // Ses Kanal ID'si
+    presence: "Beş Was Here", //Botun Durumu
+    footer: "Beş & Luppux", //Embedların Footer Yazısı
+    botOwners: ["928259219038302258"], //Bot Sahibinin ID'si
+    prefix: ".", //Botun Prefix'i 
+    manemoji: "♂️", //Erkek Emojisi
+    womanemoji: "♀️", //Kadın Emojisi
+    tagSymbol: "•", //Sunucunun Taglı İsim Sembolu => Eğer Tagınız Yoksa Boş Bırakın Veya "•" Kalsın
+    normalSymbol: "•", //Normal Kayıt Olucak Kullanıcıların Başına Gelicek Sembol
+    symbolBeş: "|", //Kayıt Esnasında İsim Ve Yaş'ı Ayıran Çizgi
+    minageAge: 15, //En Düşük Kayıt Edilebilir Yaş
+    welcomeResimURL: "https://cdn.discordapp.com/attachments/950167988127006821/1088263193832472656/beeautiful-sunset-illustration-1212023.png", //Resimli Hoşgeldin Tasarımının Arkaplan'ı => URL Şeklinde Giriniz / gif veya webp Uzantısı Kabul Etmez  
+    welcomeResimRenk: "#861765", //Resimli Hoşgeldin Tasarımının Çerçeve Rengi => HexColor Şeklinde Giriniz
+    kayitsizHesapIsim: "İsim | Yaş", //Kayıtsızların Düzeltileceği İsim
+    supheliHesapIsim: "Şüpheli", //Şüpheli Hesapların Düzeltileceği İsim
+    banGif: "https://cdn.discordapp.com/attachments/1102681495283433612/1102723534612082798/wallpaperflare.com_wallpaper_1.jpg",
+    shipArkaplan: "https://cdn.discordapp.com/attachments/930486300639891466/1103290225750450196/pexels-eberhard-grossgasteiger-1421903.jpg",
+    selamVer:false, // Kayıt Olduktan Sonra Chat kanalında Butonla Selam Verme Sistemi
 
-guildID:"", // Sunucu ID'si
-voiceChannelID:"", // Ses Kanal ID'si
-botOwners:[], // Bot Sahiplerinin ID'leri
-prefix:".", // Botun Prefix'i
-presence: "Beşş",// Botun Durumu
-WebHookURL:"", // guard-log Kanalında Oluşturulmuş Webhook URL'si
-autoBackup:true, // Otomatik Backup (Sunucu Yedek) Alma Sistemi | true = Aktif / false = Deaktif
 
-jailRoles:[], // Jail Rolünün ID'leri
+    //Eğer Buraya Kadar Yaptıysan .setup Komudunu Kullanarak Botu Sunucuna Kurmaya Başla.
+    mongoURL: "", //MongoDB URL'niz
+    topArkaplan: "https://cdn.discordapp.com/attachments/946826067174375494/1106207234783981678/pexels-eberhard-grossgasteiger-1421903.jpg", //Top Komutundaki Arkaplan Resmi (URL Şeklinde Girilicek) - Eğer Hata Verirse Bilinki URL'de Resim Yoktur,Başka Bir URL Deneyin. (⚠️ GIF,APNG Uzantılı Resimleri Desteklemez)
+    taskSystem: false, // Görev Sisteminin Aktif Veya Deaktif Hale Getirir - true = Aktif / false = Deaktif
 
-vanityURL:"",// URL Koruma Sistemi | Sunucu URL Kodu örnek; luppux
-selfBotToken:"", // URL Koruma Sistemi | Selfbot Token'i - Bilmeyenler İçin Hesap Tokeni Yani
+    staffs: [""], // Yetkililerin Rol ID'leri ["55555","55555"] Şeklinde Girilir
 
-Process:{// İşlemlerde Verilecek Cezalar "jail","ban","ytçek","kick" Şeklinde İstediğinizi Değiştirebilirsiniz
-roleAddRemove:"jail",
-roleDelete:"ban",
-roleCreate:"ytçek",
-roleUpdate:"ytçek",
-channelDelete:"kick",
-channelCreate:"ytçek",
-channelUpdate:"ytçek",
-botAdd:"kick",
-urlUpdate:"ban",
-memberBanAdd:"ytçek",
-memberKickAdd:"ytçek",
-serverUpdate:"kick",
-emojiDelete:"ytçek",
-emojiCreate:"ytçek",
-emojiUpdate:"ytçek",
-stickerDelete:"ytçek",
-stickerCreate:"ytçek",
-stickerUpdate:"ytçek",
-webhookUpdate:"kick",
-webLogin:"ytçek"
-},
+    parents: { // Kategorilerin ID'leri ["55555","55555"] Şeklinde Çoklu Girilebilir
+        publicParents: [""],
+        registerParents: [""],
+        solvingParents: [""],
+        privateParents: [""],
+        aloneParents: [""],
+        funParents: [""]
+    },
 
 
 
-antiSpam:{// Mesaj Antispam Korumasının Ayarları
-    warnThreshold: 5, 
-    muteTreshold: 8, 
-    kickTreshold: 11, 
-    banTreshold: 13,
-    warnMessage: "> **{@user} Lütfen Spam Yapma,** *Topluluğa Olumsuz Örnek Oluyorsun.*", 
-    muteMessage: "> **{@user} Spam Yaptığın İçin Mutelendin!** *Lütfen Birdaha Yapma.*", 
-    kickMessage: "> **{user_tag} Spam Yaptığı İçin Kicklendi!**", 
-    banMessage: "> **{user_tag} Spam Yaptığı İçin Banlandı!**", 
-    unMuteTime: 5, // Spam Yapan Kişi Kaç Dakika Timeout Yesin örnek; 5 = 5 Dakika Timeout Yer
-    verbose: true, 
-    removeMessages: true, 
-    ignoredPermissions: [// Antispam'dan Etkilenmiyecek İzinler
-      PermissionFlagsBits.Administrator,
-      PermissionFlagsBits.ManageMessages,
-      PermissionFlagsBits.ManageGuild
-    ], 
-  
-  },
+    limit: {
+        banLimit: 2,
+        jailLimit: 3,
+        muteLimit: 5,
+    },
 
 
-staffPerms: [// Burayı Ellemenize Gerek Yok
-  PermissionFlagsBits.Administrator,
-  PermissionFlagsBits.ManageRoles,
-  PermissionFlagsBits.ManageWebhooks,
-  PermissionFlagsBits.ManageChannels,
-  PermissionFlagsBits.ManageGuild,
-  PermissionFlagsBits.BanMembers,
-  PermissionFlagsBits.KickMembers
-],
+    logs: [
+        { name: "guard-log" },
+        { name: "family-log" },
+        { name: "command-log" },
+        { name: "ban-log" },
+        { name: "jail-log" },
+        { name: "vmute-log" },
+        { name: "mute-log" },
+        { name: "message-log" },
+        { name: "voice-log" },
+        { name: "register-log" },
+        { name: "şüpheli-log" },
+        { name: "rol-log" },
+        { name: "yasaklı-tag-log" },
+        { name: "rank-log" },
+        { name: "others-log" },
+        { name: "yetkili-başvurular" },
+        { name: "invite-log" }
+    ],
+    emojis: [
+        { name: "emote_hi", url: "https://cdn.discordapp.com/emojis/1102624348130521151.gif?size=128&quality=lossless" },
+        { name: "emote_true", url: "https://cdn.discordapp.com/emojis/1102619858941784155.webp?size=128&quality=lossless" },
+        { name: "emote_false", url: "https://cdn.discordapp.com/emojis/1102619855162703952.webp?size=128&quality=lossless" },
+        { name: "emote_warn", url: "https://cdn.discordapp.com/emojis/1102620367337562273.webp?size=128&quality=lossless" },
+        { name: "emote_man", url: "https://cdn.discordapp.com/emojis/1102620523780919376.webp?size=128&quality=lossless" },
+        { name: "emote_woman", url: "https://cdn.discordapp.com/emojis/1102620489429565553.webp?size=128&quality=lossless" },
+        { name: "emote_chat", url: "https://cdn.discordapp.com/emojis/1102621542363439305.webp?size=128&quality=lossless" },
+        { name: "emote_computer", url: "https://cdn.discordapp.com/emojis/1102621545022627850.webp?size=128&quality=lossless" },
+        { name: "emote_invite", url: "https://cdn.discordapp.com/emojis/1102621541121925262.webp?size=128&quality=lossless" },
+        { name: "emote_voice", url: "https://cdn.discordapp.com/emojis/1102621543709806602.webp?size=128&quality=lossless" },
+        { name: "emote_coin", url: "https://cdn.discordapp.com/emojis/1102622139376480276.gif?size=128&quality=lossless" },
+        { name: "emote_home", url: "https://cdn.discordapp.com/emojis/1102622711718612993.webp?size=128&quality=lossless" },
+        { name: "emote_value", url: "https://cdn.discordapp.com/emojis/1102622713408929923.gif?size=128&quality=lossless" },
+        { name: "emote_others", url: "https://cdn.discordapp.com/emojis/1102624779950895134.webp?size=128&quality=lossless" },
+        { name: "emote_emptystart", url: "https://cdn.discordapp.com/emojis/1102623376083791882.webp?size=128&quality=lossless" },
+        { name: "emote_empty", url: "https://cdn.discordapp.com/emojis/1102623377421766687.webp?size=128&quality=lossless" },
+        { name: "emote_emptyend", url: "https://cdn.discordapp.com/emojis/1102623378919149668.webp?size=128&quality=lossless" },
+        { name: "emote_fillstart", url: "https://cdn.discordapp.com/emojis/1102623397550227577.webp?size=128&quality=lossless" },
+        { name: "emote_fill", url: "https://cdn.discordapp.com/emojis/1102623398913376347.webp?size=128&quality=lossless" },
+        { name: "emote_fillend", url: "https://cdn.discordapp.com/emojis/1102623401337696349.webp?size=128&quality=lossless" },
+        { name: "emote_cmute", url: "https://cdn.discordapp.com/emojis/1102741501890547794.webp?size=128&quality=lossless" },
+        { name: "emote_vmute", url: "https://cdn.discordapp.com/emojis/1102741503329194035.webp?size=128&quality=lossless" },
+        { name: "emote_zero", url: "https://cdn.discordapp.com/emojis/1103844496162160650.gif?size=128&quality=lossless" },
+        { name: "emote_one", url: "https://cdn.discordapp.com/emojis/1103844498670354522.gif?size=128&quality=lossless" },
+        { name: "emote_two", url: "https://cdn.discordapp.com/emojis/1103844441598464040.gif?size=128&quality=lossless" },
+        { name: "emote_three", url: "https://cdn.discordapp.com/emojis/1103844446468063282.gif?size=128&quality=lossless" },
+        { name: "emote_four", url: "https://cdn.discordapp.com/emojis/1103844448787505232.gif?size=128&quality=lossless" },
+        { name: "emote_five", url: "https://cdn.discordapp.com/emojis/1103844452218458212.gif?size=128&quality=lossless" },
+        { name: "emote_six", url: "https://cdn.discordapp.com/emojis/1103844319644885082.gif?size=128&quality=lossless" },
+        { name: "emote_seven", url: "https://cdn.discordapp.com/emojis/1103844321591038104.gif?size=128&quality=lossless" },
+        { name: "emote_eight", url: "https://cdn.discordapp.com/emojis/1103844324346699796.gif?size=128&quality=lossless" },
+        { name: "emote_nine", url: "https://cdn.discordapp.com/emojis/1103844326095732776.gif?size=128&quality=lossless" },
+        { name: "emote_submessage", url: "https://cdn.discordapp.com/emojis/1103846079235108924.webp?size=128&quality=lossless" },
+        { name: "emote_web", url: "https://cdn.discordapp.com/emojis/1105493458933792819.webp?size=128&quality=lossless" },
+        { name: "emote_camera", url: "https://cdn.discordapp.com/emojis/1105493457453187162.webp?size=128&quality=lossless" },
+        { name: "emote_time", url: "https://cdn.discordapp.com/emojis/1105494402136285376.webp?size=128&quality=lossless" }
+    ],
 
-// Küfür Ve Reklam Koruma Filtresi
-Ads:['discord.gg', 'discord/gg', 'discor.gg', 'discord.gg/', 'discord.g', 'disco.gg', 'disco.g', 'disco/gg', 'disco/g', 'disco.gg/', 'discord.gg//', '.gg/',':youtube','youtu.be','telegram.org','invite','.cf',".gd.rf",".gd",".co",".ml",".tk",".net"],
-Curses:["ananınki","sikiyim","oçç","yarrak","sikerim","amcık","orospu","piç","allahını","oç","sikiyim","sikt","urospu","amına","amını","oros","s1k","y4r","piç","pic","sıkık", "4nan","oruspu","piç","sikim","siki","siktir","yarram",
-"orosbu","sikeyim","sikiyim","anneni","ananı",
-"koduğum","yarak","mcık", "yarrak","anaskm",
-"sikerim","sikik","mına","pezevenk","yavşak","orospu",
-"göt","sokuk","orspu","skm", "Sikicem", "sikicem", "evladı", "evladi",
-"siktim", "anasnı", "anasını", "anasini", "siktiğimin", "sigimin", "siktiğmin", "sikim", "kitabini", 
-"atani", "sikgimin", "atanı", "sikm", "allahını","sikko","göt","gavat","götten","pipi","götelek","g4v4t","aq","amk","abaza","abazan","ag","a\u011fz\u0131na s\u0131\u00e7ay\u0131m","ahmak","allah","allahs\u0131z","am","amar\u0131m","ambiti","am biti","amc\u0131\u011f\u0131","amc\u0131\u011f\u0131n","amc\u0131\u011f\u0131n\u0131","amc\u0131\u011f\u0131n\u0131z\u0131","amc\u0131k","amc\u0131k ho\u015faf\u0131","amc\u0131klama","amc\u0131kland\u0131","amcik","amck","amckl","amcklama","amcklaryla","amckta","amcktan","amcuk","am\u0131k","am\u0131na","am\u0131nako","am\u0131na koy","am\u0131na koyar\u0131m","am\u0131na koyay\u0131m","am\u0131nakoyim","am\u0131na koyyim","am\u0131na s","am\u0131na sikem","am\u0131na sokam","am\u0131n feryad\u0131","am\u0131n\u0131","am\u0131n\u0131 s","am\u0131n oglu","am\u0131no\u011flu","am\u0131n o\u011flu","am\u0131s\u0131na","am\u0131s\u0131n\u0131","amina","amina g","amina k","aminako","aminakoyarim","amina koyarim","amina koyay\u0131m","amina koyayim","aminakoyim","aminda","amindan","amindayken","amini","aminiyarraaniskiim","aminoglu","amin oglu","amiyum","amk","amkafa","amk \u00e7ocu\u011fu","amlarnzn","aml\u0131","amm","ammak","ammna","amn","amna","amnda","amndaki","amngtn","amnn","amona","amq","ams\u0131z","amsiz","amsz","amteri","amugaa","amu\u011fa","amuna","ana","anaaann","anal","analarn","anam","anamla","anan","anana","anandan","anan\u0131","anan\u0131","anan\u0131n","anan\u0131n am","anan\u0131n am\u0131","anan\u0131n d\u00f6l\u00fc","anan\u0131nki","anan\u0131sikerim","anan\u0131 sikerim","anan\u0131sikeyim","anan\u0131 sikeyim","anan\u0131z\u0131n","anan\u0131z\u0131n am","anani","ananin","ananisikerim","anani sikerim","ananisikeyim","anani sikeyim","anann","ananz","anas","anas\u0131n\u0131","anas\u0131n\u0131n am","anas\u0131 orospu","anasi","anasinin","anay","anayin","angut","anneni","annenin","annesiz","anuna","aptal","aq","a.q","a.q.","aq.","ass","atkafas\u0131","atm\u0131k","att\u0131rd\u0131\u011f\u0131m","attrrm","auzlu","avrat","ayklarmalrmsikerim","azd\u0131m","azd\u0131r","azd\u0131r\u0131c\u0131","babaannesi ka\u015far","baban\u0131","baban\u0131n","babani","babas\u0131 pezevenk","baca\u011f\u0131na s\u0131\u00e7ay\u0131m","bac\u0131na","bac\u0131n\u0131","bac\u0131n\u0131n","bacini","bacn","bacndan","bacy","bastard","basur","beyinsiz","b\u0131z\u0131r","bitch","biting","bok","boka","bokbok","bok\u00e7a","bokhu","bokkkumu","boklar","boktan","boku","bokubokuna","bokum","bombok","boner","bosalmak","bo\u015falmak","cenabet","cibiliyetsiz","cibilliyetini","cibilliyetsiz","cif","cikar","cim","\u00e7\u00fck","dalaks\u0131z","dallama","daltassak","dalyarak","dalyarrak","dangalak","dassagi","diktim","dildo","dingil","dingilini","dinsiz","dkerim","domal","domalan","domald\u0131","domald\u0131n","domal\u0131k","domal\u0131yor","domalmak","domalm\u0131\u015f","domals\u0131n","domalt","domaltarak","domalt\u0131p","domalt\u0131r","domalt\u0131r\u0131m","domaltip","domaltmak","d\u00f6l\u00fc","d\u00f6nek","d\u00fcd\u00fck","eben","ebeni","ebenin","ebeninki","ebleh","ecdad\u0131n\u0131","ecdadini","embesil","emi","fahise","fahi\u015fe","feri\u015ftah","ferre","fuck","fucker","fuckin","fucking","gavad","gavat","geber","geberik","gebermek","gebermi\u015f","gebertir","ger\u0131zekal\u0131","gerizekal\u0131","gerizekali","gerzek","giberim","giberler","gibis","gibi\u015f","gibmek","gibtiler","goddamn","godo\u015f","godumun","gotelek","gotlalesi","gotlu","gotten","gotundeki","gotunden","gotune","gotunu","gotveren","goyiim","goyum","goyuyim","goyyim","g\u00f6t","g\u00f6t deli\u011fi","g\u00f6telek","g\u00f6t herif","g\u00f6tlalesi","g\u00f6tlek","g\u00f6to\u011flan\u0131","g\u00f6t o\u011flan\u0131","g\u00f6to\u015f","g\u00f6tten","g\u00f6t\u00fc","g\u00f6t\u00fcn","g\u00f6t\u00fcne","g\u00f6t\u00fcnekoyim","g\u00f6t\u00fcne koyim","g\u00f6t\u00fcn\u00fc","g\u00f6tveren","g\u00f6t veren","g\u00f6t verir","gtelek","gtn","gtnde","gtnden","gtne","gtten","gtveren","hasiktir","hassikome","hassiktir","has siktir","hassittir","haysiyetsiz","hayvan herif","ho\u015faf\u0131","h\u00f6d\u00fck","hsktr","huur","\u0131bnel\u0131k","ibina","ibine","ibinenin","ibne","ibnedir","ibneleri","ibnelik","ibnelri","ibneni","ibnenin","ibnerator","ibnesi","idiot","idiyot","imansz","ipne","iserim","i\u015ferim","ito\u011flu it","kafam girsin","kafas\u0131z","kafasiz","kahpe","kahpenin","kahpenin feryad\u0131","kaka","kaltak","kanc\u0131k","kancik","kappe","karhane","ka\u015far","kavat","kavatn","kaypak","kayyum","kerane","kerhane","kerhanelerde","kevase","keva\u015fe","kevvase","koca g\u00f6t","kodu\u011fmun","kodu\u011fmunun","kodumun","kodumunun","koduumun","koyarm","koyay\u0131m","koyiim","koyiiym","koyim","koyum","koyyim","krar","kukudaym","laciye boyad\u0131m","lavuk","libo\u015f","madafaka","mal","malafat","malak","manyak","mcik","meme","memelerini","mezveleli","minaamc\u0131k","mincikliyim","mna","monakkoluyum","motherfucker","mudik","oc","ocuu","ocuun","O\u00c7","o\u00e7","o. \u00e7ocu\u011fu","o\u011flan","o\u011flanc\u0131","o\u011flu it","orosbucocuu","orospu","orospucocugu","orospu cocugu","orospu \u00e7oc","orospu\u00e7ocu\u011fu","orospu \u00e7ocu\u011fu","orospu \u00e7ocu\u011fudur","orospu \u00e7ocuklar\u0131","orospudur","orospular","orospunun","orospunun evlad\u0131","orospuydu","orospuyuz","orostoban","orostopol","orrospu","oruspu","oruspu\u00e7ocu\u011fu","oruspu \u00e7ocu\u011fu","osbir","ossurduum","ossurmak","ossuruk","osur","osurduu","osuruk","osururum","otuzbir","\u00f6k\u00fcz","\u00f6\u015fex","patlak zar","penis","pezevek","pezeven","pezeveng","pezevengi","pezevengin evlad\u0131","pezevenk","pezo","pic","pici","picler","pi\u00e7","pi\u00e7in o\u011flu","pi\u00e7 kurusu","pi\u00e7ler","pipi","pipi\u015f","pisliktir","porno","pussy","pu\u015ft","pu\u015fttur","rahminde","revizyonist","s1kerim","s1kerm","s1krm","sakso","saksofon","salaak","salak","saxo","sekis","serefsiz","sevgi koyar\u0131m","sevi\u015felim","sexs","s\u0131\u00e7ar\u0131m","s\u0131\u00e7t\u0131\u011f\u0131m","s\u0131ecem","sicarsin","sie","sik","sikdi","sikdi\u011fim","sike","sikecem","sikem","siken","sikenin","siker","sikerim","sikerler","sikersin","sikertir","sikertmek","sikesen","sikesicenin","sikey","sikeydim","sikeyim","sikeym","siki","sikicem","sikici","sikien","sikienler","sikiiim","sikiiimmm","sikiim","sikiir","sikiirken","sikik","sikil","sikildiini","sikilesice","sikilmi","sikilmie","sikilmis","sikilmi\u015f","sikilsin","sikim","sikimde","sikimden","sikime","sikimi","sikimiin","sikimin","sikimle","sikimsonik","sikimtrak","sikin","sikinde","sikinden","sikine","sikini","sikip","sikis","sikisek","sikisen","sikish","sikismis","siki\u015f","siki\u015fen","siki\u015fme","sikitiin","sikiyim","sikiym","sikiyorum","sikkim","sikko","sikleri","sikleriii","sikli","sikm","sikmek","sikmem","sikmiler","sikmisligim","siksem","sikseydin","sikseyidin","siksin","siksinbaya","siksinler","siksiz","siksok","siksz","sikt","sikti","siktigimin","siktigiminin","sikti\u011fim","sikti\u011fimin","sikti\u011fiminin","siktii","siktiim","siktiimin","siktiiminin","siktiler","siktim","siktim","siktimin","siktiminin","siktir","siktir et","siktirgit","siktir git","siktirir","siktiririm","siktiriyor","siktir lan","siktirolgit","siktir ol git","sittimin","sittir","skcem","skecem","skem","sker","skerim","skerm","skeyim","skiim","skik","skim","skime","skmek","sksin","sksn","sksz","sktiimin","sktrr","skyim","slaleni","sokam","sokar\u0131m","sokarim","sokarm","sokarmkoduumun","sokay\u0131m","sokaym","sokiim","soktu\u011fumunun","sokuk","sokum","soku\u015f","sokuyum","soxum","sulaleni","s\u00fclaleni","s\u00fclalenizi","s\u00fcrt\u00fck","\u015ferefsiz","\u015f\u0131ll\u0131k","taaklarn","taaklarna","tarrakimin","tasak","tassak","ta\u015fak","ta\u015f\u015fak","tipini s.k","tipinizi s.keyim","tiyniyat","toplarm","topsun","toto\u015f","vajina","vajinan\u0131","veled","veledizina","veled i zina","verdiimin","weled","weledizina","whore","xikeyim","yaaraaa","yalama","yalar\u0131m","yalarun","yaraaam","yarak","yaraks\u0131z","yaraktr","yaram","yaraminbasi","yaramn","yararmorospunun","yarra","yarraaaa","yarraak","yarraam","yarraam\u0131","yarragi","yarragimi","yarragina","yarragindan","yarragm","yarra\u011f","yarra\u011f\u0131m","yarra\u011f\u0131m\u0131","yarraimin","yarrak","yarram","yarramin","yarraminba\u015f\u0131","yarramn","yarran","yarrana","yarrrak","yavak","yav\u015f","yav\u015fak","yav\u015fakt\u0131r","yavu\u015fak","y\u0131l\u0131\u015f\u0131k","yilisik","yogurtlayam","yo\u011furtlayam","yrrak","z\u0131kk\u0131m\u0131m","zibidi","zigsin","zikeyim","zikiiim","zikiim","zikik","zikim","ziksiiin","ziksiin","zulliyetini","zviyetini"]
+
+    burcRoles: [
+        { name: "Koç", icon: "https://cdn.discordapp.com/emojis/1054803690848006164.png?size=128&quality=lossless" },
+        { name: "Boğa", icon: "https://cdn.discordapp.com/emojis/1054803741250957324.png?size=128&quality=lossless" },
+        { name: "İkizler", icon: "https://cdn.discordapp.com/emojis/1054803754232324107.png?size=128&quality=lossless" },
+        { name: "Yengeç", icon: "https://cdn.discordapp.com/emojis/1054788879422599209.png?size=128&quality=lossless" },
+        { name: "Aslan", icon: "https://cdn.discordapp.com/emojis/1054803703808397413.png?size=128&quality=lossless" },
+        { name: "Başak", icon: "https://cdn.discordapp.com/emojis/1054803729901166622.png?size=128&quality=lossless" },
+        { name: "Terazi", icon: "https://cdn.discordapp.com/emojis/1099539509596663819.png?size=128&quality=lossless" },
+        { name: "Akrep", icon: "https://cdn.discordapp.com/emojis/1054803768031588403.png?size=128&quality=lossless" },
+        { name: "Yay", icon: "https://cdn.discordapp.com/emojis/1054788894262038548.png?size=128&quality=lossless" },
+        { name: "Oğlak", icon: "https://cdn.discordapp.com/emojis/1054803665367617586.png?size=128&quality=lossless" },
+        { name: "Kova", icon: "https://cdn.discordapp.com/emojis/1054803678168629398.png?size=128&quality=lossless" },
+        { name: "Balık", icon: "https://cdn.discordapp.com/emojis/1054803716689113108.png?size=128&quality=lossless" },
+    ],
+
+    iliskiRoles: [
+        { name: "Sevgilim Var", icon: "💖", color: "#ff0000" },
+        { name: "Sevgilim Yok", icon: "🙄", color: "#2e5a6e" },
+        { name: "Sevgili Yapmıyorum", icon: "🥱", color: "#bf9f3d" },
+    ],
+
+    etkinlikRoles: [
+        { name: "Çekiliş Katılımcısı", icon: "🎉", color: "#21a327" },
+        { name: "Etkinlik Katılımcısı", icon: "📣", color: "#2151a3" },
+    ],
+
+    renkRoles: [
+        { name: "🍓", color: "#ff0000" },
+        { name: "🍏", color: "#00ff00" },
+        { name: "🍌", color: "#fffb17" },
+        { name: "🍇", color: "#7417ff" },
+        { name: "🌼", color: "#ffffff" },
+        { name: "🥕", color: "#ff8400" },
+    ],
+
+    levelRoles: [
+        { name: "Chat Bronze", color: "#b47402" },
+        { name: "Chat Silver", color: "#b1b1b1" },
+        { name: "Chat Gold", color: "#faff00" },
+        { name: "Chat Diamond", color: "#00fffb" },
+        { name: "Voice Bronze", color: "#b47402" },
+        { name: "Voice Silver", color: "#b1b1b1" },
+        { name: "Voice Gold", color: "#faff00" },
+        { name: "Voice Diamond", color: "#00fffb" },
+    ]
+
+
+
 }
